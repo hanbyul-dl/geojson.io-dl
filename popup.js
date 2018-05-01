@@ -5,8 +5,6 @@
 'use strict';
 
 // let changeColor = document.getElementById('changeColor');
-let dlTiles = document.getElementById('dl-tiles');
-let gists = document.getElementById('gists');
 
 function sendMessageToContent (request) {
   chrome.tabs.query({currentWindow: true, active: true}, function (tabs){
@@ -21,26 +19,8 @@ function sendMessageToBackground (request) {
 
 
 chrome.storage.sync.get(['auth_token'], function(data) {
-  // Uncomment this to clear local storage
-  // chrome.storage.sync.clear(function(){console.log('cleared')});
-  console.log(data.hasOwnProperty('auth_token'));
-
   if (!data.hasOwnProperty('auth_token')) {
-    let authWrapper = document.getElementById('auth');
-    let authTextArea = document.createElement('textarea');
-    authTextArea.classList.add("w100");
-    let authBtn = document.createElement('button');
-    authBtn.type = 'button';
-    authBtn.classList.add("w100");
-    authBtn.textContent = 'SAVE TOKEN';
-    authWrapper.appendChild(authTextArea);
-    authWrapper.appendChild(authBtn);
-    authBtn.onclick = function autoBtnClick () {
-      sendMessageToBackground({
-        action: 'SAVE_TOKEN',
-        value: authTextArea.value.trim()
-      });
-    }
+    showAuthTokenInput();
   // if a user already saved a token
   } else {
     fetchDLTiles(data.auth_token)
@@ -50,6 +30,33 @@ chrome.storage.sync.get(['auth_token'], function(data) {
   }
 });
 
+function clearCurrentAuth () {
+  // clear current Token first
+  chrome.storage.sync.get(['auth_token'], function(data) {
+    if (data.hasOwnProperty('auth_token')) {
+      chrome.storage.sync.remove('auth_token', function() { console.log('auth token cleared')} );
+    }
+  });
+}
+
+function showAuthTokenInput () {
+
+  let authWrapper = document.getElementById('auth');
+  let authTextArea = document.createElement('textarea');
+  authTextArea.classList.add("w100");
+  let authBtn = document.createElement('button');
+  authBtn.type = 'button';
+  authBtn.classList.add("w100");
+  authBtn.textContent = 'SAVE TOKEN';
+  authWrapper.appendChild(authTextArea);
+  authWrapper.appendChild(authBtn);
+  authBtn.onclick = function autoBtnClick () {
+    sendMessageToBackground({
+      action: 'SAVE_TOKEN',
+      value: authTextArea.value.trim()
+    });
+  }
+}
 
 function fetchDLTiles (authToken) {
   return fetch("https://platform.descarteslabs.com/tiles/v2/xyz", {
@@ -59,9 +66,18 @@ function fetchDLTiles (authToken) {
       'Content-Type': 'application/json'
   })})
   .then(function(response) {
-    return response.json();
+    // unauthorized
+    // TO DO : deal with other error codes
+    if (response.status === 401) {
+      clearCurrentAuth();
+      showAuthTokenInput();
+      return Promise.reject();
+    } else {
+        return response.json();
+    }
   }).then(function(myJson) {
     var products = myJson;
+    let dlTiles = document.getElementById('dl-tiles');
     var dropdown = document.createElement('select');
     var dropdownLabel = document.createElement('label');
     dropdownLabel.textContent = 'DL tiles';
@@ -77,24 +93,39 @@ function fetchDLTiles (authToken) {
           dropdown.appendChild(option);
         })
 
+        let emptyOption = createPlaceholderOption('dl tiles');
+        dropdown.prepend(emptyOption);
+
       dropdown.onchange = function selectProduct() {
         var selectedProductID = document.getElementById('product-dropdown').value;
         // send the event to content.js
-        sendMessageToContent({
-          "action": 'PRODUCT_SECLECTED',
-          "value": selectedProductID
-        });
+        if(!!selectedProductID.length) {
+
+          sendMessageToContent({
+            "action": 'PRODUCT_SECLECTED',
+            "value": selectedProductID
+          });
+        }
       }
       dlTiles.appendChild(dropdown);
       return true;
   });
 }
 
+function createPlaceholderOption (name) {
+  var emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  emptyOption.textContent = `--- Please select one of ${name} to load ---`;
+  emptyOption.selected = 'selected';
+  return emptyOption;
+}
+
 function fetchGists () {
-  fetch("https://api.github.com/users/hanbyul-here/gists")
+  fetch("https://api.github.com/users/hanbyul-dl/gists")
   .then(function(response) {
     return response.json();
   }).then(function(myGists) {
+    let gists = document.getElementById('gists');
     var gistDropdown = document.createElement('select');
     gistDropdown.classList.add('w100');
     gistDropdown.id = 'gists-dropdown';
@@ -120,15 +151,20 @@ function fetchGists () {
       option.value = gist.raw_url;
       option.textContent = gist.filename;
       gistDropdown.appendChild(option);
-    })
+    });
+    let emptyOption = createPlaceholderOption('gists');
+    gistDropdown.prepend(emptyOption);
 
       gistDropdown.onchange = function selectGist() {
         var selectedGist = document.getElementById('gists-dropdown').value;
         // send the event to content.js
-        sendMessageToContent({
-          "action": 'GIST_SELECTED',
-          "value": selectedGist
-        });
+        if (!!selectedGist.length) {
+          console.log("?? yas")
+          sendMessageToContent({
+            "action": 'GIST_SELECTED',
+            "value": selectedGist
+          });
+        }
       }
       gists.appendChild(gistDropdown);
   })
