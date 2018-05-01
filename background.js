@@ -5,9 +5,6 @@
 'use strict';
 
 chrome.runtime.onInstalled.addListener(function() {
-  chrome.storage.sync.set({color: '#3aa757'}, function() {
-    console.log('The color is green.');
-  });
   chrome.declarativeContent.onPageChanged.removeRules(undefined, function() {
     chrome.declarativeContent.onPageChanged.addRules([{
       conditions: [new chrome.declarativeContent.PageStateMatcher({
@@ -24,8 +21,9 @@ chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
     // forward request to popup.js
     // chrome.runtime.sendMessage(request);
-    if (request.action === 'SAVE_JWT_TOKEN') {
-      chrome.storage.sync.set({'auth_token': request.auth_token}, function() {
+    if (request.action === 'SAVE_TOKEN') {
+      chrome.storage.sync.set({'auth_token': request.value}, function() {
+        //TO DO: refresh the popup with saved token
         console.log('Token is saved.');
       });
     }

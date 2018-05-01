@@ -13,16 +13,10 @@ document.addEventListener('RW759_connectExtension', function(e) {
     // Do something, for example:
     console.log('got the event')
     console.log(e.detail);
-    // alert(JSON.stringify(e.detail));
-    // chrome.runtime.sendMessage({
-    //   action: "RECEIVED_PRODUCTS",
-    //   products: e.detail.products
-    // }, function(response) {
-    //   console.log('connected')
-    // });
 });
 
 
+// Event listener
 chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
     console.log('from content');
