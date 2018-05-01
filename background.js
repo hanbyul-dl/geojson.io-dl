@@ -25,6 +25,11 @@ chrome.runtime.onMessage.addListener(
       chrome.storage.sync.set({'auth_token': request.value}, function() {
         //TO DO: refresh the popup with saved token
         console.log('Token is saved.');
+        // send the message to popup to close
+        chrome.runtime.sendMessage({
+          action: 'TOKEN_SAVED',
+          value: request.value
+        });
       });
     }
  }

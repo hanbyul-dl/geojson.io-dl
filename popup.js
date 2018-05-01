@@ -32,6 +32,7 @@ chrome.storage.sync.get(['auth_token'], function(data) {
 
 function clearCurrentAuth () {
   // clear current Token first
+  console.log('cleear');
   chrome.storage.sync.get(['auth_token'], function(data) {
     if (data.hasOwnProperty('auth_token')) {
       chrome.storage.sync.remove('auth_token', function() { console.log('auth token cleared')} );
@@ -42,8 +43,13 @@ function clearCurrentAuth () {
 function showAuthTokenInput () {
 
   let authWrapper = document.getElementById('auth');
+  let authLabel = document.createElement('label');
+  authLabel.classList.add('bm10');
+  authLabel.innerHTML = 'Get your token from <a href="https://iam.descarteslabs.com/auth/credentials">DL Platform </a>';
+  authWrapper.append(authLabel);
   let authTextArea = document.createElement('textarea');
   authTextArea.classList.add("w100");
+  authTextArea.classList.add("bm10");
   let authBtn = document.createElement('button');
   authBtn.type = 'button';
   authBtn.classList.add("w100");
@@ -159,7 +165,6 @@ function fetchGists () {
         var selectedGist = document.getElementById('gists-dropdown').value;
         // send the event to content.js
         if (!!selectedGist.length) {
-          console.log("?? yas")
           sendMessageToContent({
             "action": 'GIST_SELECTED',
             "value": selectedGist
@@ -170,23 +175,23 @@ function fetchGists () {
   })
 }
 
+function removeAuthInput () {
+  let authWrapper = document.getElementById('auth');
+  while (authWrapper.firstChild) {
+      authWrapper.removeChild(authWrapper.firstChild);
+  }
+}
 
-
-//
-// chrome.runtime.onMessage.addListener(
-//     function(request, sender, sendResponse) {
-//         if (request.action === "RECEIVED_PRODUCTS") {
-//             //  To do something
-//             var dropdown = document.createElement('select');
-//             request.products
-//                 .map((p) => {
-//                   var option = document.createElement('option');
-//                   option.value = p.id;
-//                   option.textContent = p.id;
-//                   dropdown.appendChild(option);
-//                 })
-//               document.getElementById('sample').appendChild(dropdown);
-//             //document.getElementById('sample').textContent = JSON.stringify(request.products);
-//         }
-//     }
-// );
+chrome.runtime.onMessage.addListener(
+    function(request, sender, sendResponse) {
+        if (request.action === "TOKEN_SAVED") {
+            removeAuthInput();
+            authWrapper.innerHTML = '<span>Your token successfully saved</span>';
+            fetchDLTiles(request.value);
+            fetchGists();
+            setTimeout(function () {
+              removeAuthInput();
+            }, 1000);
+        }
+    }
+);
