@@ -4,8 +4,6 @@
 
 'use strict';
 
-// let changeColor = document.getElementById('changeColor');
-
 function sendMessageToContent (request) {
   chrome.tabs.query({currentWindow: true, active: true}, function (tabs){
     var activeTab = tabs[0];
@@ -17,22 +15,8 @@ function sendMessageToBackground (request) {
   chrome.runtime.sendMessage(request);
 }
 
-
-chrome.storage.sync.get(['auth_token'], function(data) {
-  if (!data.hasOwnProperty('auth_token')) {
-    showAuthTokenInput();
-  // if a user already saved a token
-  } else {
-    fetchDLTiles(data.auth_token)
-    .then(function() {
-      fetchGists();
-    });
-  }
-});
-
 function clearCurrentAuth () {
   // clear current Token first
-  console.log('cleear');
   chrome.storage.sync.get(['auth_token'], function(data) {
     if (data.hasOwnProperty('auth_token')) {
       chrome.storage.sync.remove('auth_token', function() { console.log('auth token cleared')} );
@@ -45,7 +29,7 @@ function showAuthTokenInput () {
   let authWrapper = document.getElementById('auth');
   let authLabel = document.createElement('label');
   authLabel.classList.add('bm10');
-  authLabel.innerHTML = 'Get your token from <a href="https://iam.descarteslabs.com/auth/credentials">DL Platform </a>';
+  authLabel.innerHTML = 'Get your token from <a href="https://iam.descarteslabs.com/auth/credentials" target="_blank">DL Platform </a>';
   authWrapper.append(authLabel);
   let authTextArea = document.createElement('textarea');
   authTextArea.classList.add("w100");
@@ -65,6 +49,29 @@ function showAuthTokenInput () {
 }
 
 function fetchDLTiles (authToken) {
+  let dlTiles = document.getElementById('dl-tiles');
+
+  var dropdownLabel = document.createElement('label');
+  dropdownLabel.textContent = 'DL tiles';
+
+  var dropdown = document.createElement('select');
+  dropdown.classList.add('w100');
+  dropdown.classList.add('mb-10');
+  dropdown.id = 'product-dropdown';
+
+  dropdown.onchange = function selectProduct() {
+    var selectedProductID = document.getElementById('product-dropdown').value;
+    // send the event to content.js
+    if(!!selectedProductID.length) {
+      sendMessageToContent({
+        "action": 'PRODUCT_SECLECTED',
+        "value": selectedProductID
+      });
+    }
+  }
+
+  displayLoadingStatus(dlTiles, true);
+
   return fetch("https://platform.descarteslabs.com/tiles/v2/xyz", {
     method: 'get',
     headers: new Headers({
@@ -72,47 +79,31 @@ function fetchDLTiles (authToken) {
       'Content-Type': 'application/json'
   })})
   .then(function(response) {
-    // unauthorized
     // TO DO : deal with other error codes
     if (response.status === 401) {
+      // unauthorized
       clearCurrentAuth();
       showAuthTokenInput();
-      return Promise.reject();
+      return Promise.reject('not authorized');
     } else {
         return response.json();
     }
-  }).then(function(myJson) {
+  })
+  .then(function(myJson) {
     var products = myJson;
-    let dlTiles = document.getElementById('dl-tiles');
-    var dropdown = document.createElement('select');
-    var dropdownLabel = document.createElement('label');
-    dropdownLabel.textContent = 'DL tiles';
-    dlTiles.appendChild(dropdownLabel);
-    dropdown.classList.add('w100');
-    dropdown.classList.add('mb-10');
-    dropdown.id = 'product-dropdown';
     products
-        .map((p) => {
-          var option = document.createElement('option');
-          option.value = p.id;
-          option.textContent = p.id;
-          dropdown.appendChild(option);
-        })
+      .map((p) => {
+        var option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = p.id;
+        dropdown.appendChild(option);
+      })
 
-        let emptyOption = createPlaceholderOption('dl tiles');
-        dropdown.prepend(emptyOption);
+      let emptyOption = createPlaceholderOption('dl tiles');
+      dropdown.prepend(emptyOption);
 
-      dropdown.onchange = function selectProduct() {
-        var selectedProductID = document.getElementById('product-dropdown').value;
-        // send the event to content.js
-        if(!!selectedProductID.length) {
-
-          sendMessageToContent({
-            "action": 'PRODUCT_SECLECTED',
-            "value": selectedProductID
-          });
-        }
-      }
+      displayLoadingStatus(dlTiles, false);
+      dlTiles.appendChild(dropdownLabel);
       dlTiles.appendChild(dropdown);
       return true;
   });
@@ -127,17 +118,32 @@ function createPlaceholderOption (name) {
 }
 
 function fetchGists () {
+  let gists = document.getElementById('gists');
+
+  let gistDropdown = document.createElement('select');
+  gistDropdown.classList.add('w100');
+  gistDropdown.id = 'gists-dropdown';
+
+  gistDropdown.onchange = function selectGist() {
+    var selectedGist = document.getElementById('gists-dropdown').value;
+    // send the event to content.js
+    if (!!selectedGist.length) {
+      sendMessageToContent({
+        "action": 'GIST_SELECTED',
+        "value": selectedGist
+      });
+    }
+  }
+
+  let gistLabel = document.createElement('label');
+  gistLabel.textContent = 'Gists';
+
+  displayLoadingStatus(gists, true);
+
   fetch("https://api.github.com/users/hanbyul-dl/gists")
   .then(function(response) {
     return response.json();
   }).then(function(myGists) {
-    let gists = document.getElementById('gists');
-    var gistDropdown = document.createElement('select');
-    gistDropdown.classList.add('w100');
-    gistDropdown.id = 'gists-dropdown';
-    var gistLabel = document.createElement('label');
-    gistLabel.textContent = 'Gists';
-    gists.appendChild(gistLabel);
     // only fetch files ending with json. (possible it is not geojson)
     var regex = /json$/;
     myGists.filter(function(gist) {
@@ -161,17 +167,9 @@ function fetchGists () {
     let emptyOption = createPlaceholderOption('gists');
     gistDropdown.prepend(emptyOption);
 
-      gistDropdown.onchange = function selectGist() {
-        var selectedGist = document.getElementById('gists-dropdown').value;
-        // send the event to content.js
-        if (!!selectedGist.length) {
-          sendMessageToContent({
-            "action": 'GIST_SELECTED',
-            "value": selectedGist
-          });
-        }
-      }
-      gists.appendChild(gistDropdown);
+    displayLoadingStatus(gists, false);
+    gists.appendChild(gistLabel);
+    gists.appendChild(gistDropdown);
   })
 }
 
@@ -182,10 +180,25 @@ function removeAuthInput () {
   }
 }
 
+function displayLoadingStatus(elem, show) {
+  if (show) {
+    let loadingText = document.createElement('span');
+    loadingText.id = elem.id + '-loading';
+    loadingText.textContent = 'loading...';
+    elem.appendChild(loadingText);
+  } else {
+    let loadingText = document.getElementById(elem.id + '-loading');
+    console.log(elem.id + '-loading');
+    loadingText.parentNode.removeChild(loadingText);
+  }
+}
+
+// Remove auth token input when token is saved
 chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
         if (request.action === "TOKEN_SAVED") {
             removeAuthInput();
+            let authWrapper = document.getElementById('auth');
             authWrapper.innerHTML = '<span>Your token successfully saved</span>';
             fetchDLTiles(request.value);
             fetchGists();
@@ -195,3 +208,16 @@ chrome.runtime.onMessage.addListener(
         }
     }
 );
+
+
+chrome.storage.sync.get(['auth_token'], function(data) {
+  if (!data.hasOwnProperty('auth_token')) {
+    showAuthTokenInput();
+  // if a user already saved a token
+} else {
+    fetchDLTiles(data.auth_token)
+    .then(function() {
+      fetchGists();
+    });
+  }
+});
