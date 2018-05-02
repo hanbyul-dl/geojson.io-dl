@@ -1,10 +1,12 @@
 // injecting a script that is going to interact actual browser console
-var s = document.createElement('script');
-s.src = chrome.extension.getURL('inject.js');
-(document.head||document.documentElement).appendChild(s);
-s.onload = function() {
-    s.remove();
-};
+if (window.location.href.includes('geojson.io')) {
+  var s = document.createElement('script');
+  s.src = chrome.extension.getURL('inject.js');
+  (document.head||document.documentElement).appendChild(s);
+  s.onload = function() {
+      s.remove();
+  };
+}
 
 // Event listener
 document.addEventListener('RW759_connectExtension', function(e) {
