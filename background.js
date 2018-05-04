@@ -30,9 +30,59 @@ chrome.runtime.onMessage.addListener(
           action: 'TOKEN_SAVED',
           value: request.value
         });
+        fetchDLProducts();
       });
     }
- }
+ });
+
+
+
+//
+//
+function fetchDLProducts () {
+  chrome.storage.sync.get(['auth_token'], function(data) {
+    if (data.hasOwnProperty('auth_token')) {
+      let authToken = data.auth_token;
+      return fetch("https://platform.descarteslabs.com/tiles/v2/xyz", {
+        method: 'get',
+        headers: new Headers({
+          'Authorization': authToken,
+          'Content-Type': 'application/json'
+      })})
+      .then(function(response) {
+        // TO DO : deal with other error codes
+        if (response.status === 401) {
+          // unauthorized
+          chrome.runtime.sendMessage({
+            action: 'DL_AUTHORIZATION_FAIL'
+          });
+          return Promise.reject('not authorized');
+        } else {
+            return response.json();
+        }
+      })
+      .then(function(myJson) {
+        chrome.runtime.sendMessage({
+          action: 'DL_PRODUCTS_FETCHED',
+          value: myJson
+        });
+        chrome.storage.sync.set({'dl_products': myJson}, function() {
+          console.log('products fetched');
+        })
+      });
+    }
+  });
+}
+
+chrome.runtime.onMessage.addListener(
+  function(request, sender, sendResponse) {
+      if (request.action === "FETCH_DL_PRODUCTS") {
+        fetchDLProducts();
+      }
+    }
+)
+
+
 
 
  // chrome.runtime.onMessage.addListener(
@@ -52,4 +102,4 @@ chrome.runtime.onMessage.addListener(
  //         }
  //     }
  // );
-);
+// );

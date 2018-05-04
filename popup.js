@@ -48,7 +48,27 @@ function showAuthTokenInput () {
   }
 }
 
-function fetchDLTiles (authToken) {
+function showFetchNewDLProductsButton (parentElem) {
+  let fetchButton = document.createElement('button');
+  fetchButton.type = 'button';
+  fetchButton.textContent = 'Reload';
+  fetchButton.classList.add('w100');
+  fetchButton.onclick = function () {
+    // delete current dl product dropdown
+    while (parentElem.firstChild) {
+        parentElem.removeChild(parentElem.firstChild);
+    }
+
+    displayLoadingStatus(parentElem, true);
+
+    sendMessageToBackground({
+      action: 'FETCH_DL_PRODUCTS'
+    })
+  }
+  parentElem.appendChild(fetchButton);
+}
+
+function showDLProducts (products) {
   let dlTiles = document.getElementById('dl-tiles');
 
   var dropdownLabel = document.createElement('label');
@@ -70,43 +90,21 @@ function fetchDLTiles (authToken) {
     }
   }
 
-  displayLoadingStatus(dlTiles, true);
+  products
+    .map((p) => {
+      var option = document.createElement('option');
+      option.value = p.id;
+      option.textContent = p.id;
+      dropdown.appendChild(option);
+    })
 
-  return fetch("https://platform.descarteslabs.com/tiles/v2/xyz", {
-    method: 'get',
-    headers: new Headers({
-      'Authorization': authToken,
-      'Content-Type': 'application/json'
-  })})
-  .then(function(response) {
-    // TO DO : deal with other error codes
-    if (response.status === 401) {
-      // unauthorized
-      clearCurrentAuth();
-      showAuthTokenInput();
-      return Promise.reject('not authorized');
-    } else {
-        return response.json();
-    }
-  })
-  .then(function(myJson) {
-    var products = myJson;
-    products
-      .map((p) => {
-        var option = document.createElement('option');
-        option.value = p.id;
-        option.textContent = p.id;
-        dropdown.appendChild(option);
-      })
+    let emptyOption = createPlaceholderOption('dl tiles');
+    dropdown.prepend(emptyOption);
 
-      let emptyOption = createPlaceholderOption('dl tiles');
-      dropdown.prepend(emptyOption);
-
-      displayLoadingStatus(dlTiles, false);
-      dlTiles.appendChild(dropdownLabel);
-      dlTiles.appendChild(dropdown);
-      return true;
-  });
+    // displayLoadingStatus(dlTiles, false);
+    dlTiles.appendChild(dropdownLabel);
+    dlTiles.appendChild(dropdown);
+    showFetchNewDLProductsButton(dlTiles);
 }
 
 function createPlaceholderOption (name) {
@@ -200,24 +198,29 @@ chrome.runtime.onMessage.addListener(
             removeAuthInput();
             let authWrapper = document.getElementById('auth');
             authWrapper.innerHTML = '<span>Your token successfully saved</span>';
-            fetchDLTiles(request.value);
-            fetchGists();
-            setTimeout(function () {
-              removeAuthInput();
-            }, 1000);
+        } else if (request.action === 'DL_AUTHORIZATION_FAIL') {
+          showAuthTokenInput();
+        }
+    }
+);
+
+chrome.runtime.onMessage.addListener(
+    function(request, sender, sendResponse) {
+        if (request.action === "DL_PRODUCTS_FETCHED") {
+            displayLoadingStatus(document.getElementById('dl-tiles'), false);
+            showDLProducts(request.value);
         }
     }
 );
 
 
-chrome.storage.sync.get(['auth_token'], function(data) {
-  if (!data.hasOwnProperty('auth_token')) {
+
+chrome.storage.sync.get(['dl_products'], function(data) {
+  if (!data.hasOwnProperty('dl_products')) {
     showAuthTokenInput();
   // if a user already saved a token
 } else {
-    fetchDLTiles(data.auth_token)
-    .then(function() {
-      fetchGists();
-    });
+    showDLProducts(data.dl_products);
+    fetchGists();
   }
 });
